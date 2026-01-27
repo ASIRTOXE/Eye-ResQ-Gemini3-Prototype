@@ -18,7 +18,7 @@ Built entirely using **Google AI Studio** to leverage the native reasoning capab
 ## ⚡ How to Test (The Logic Core)
 This repository contains the exported application code. However, for the most direct demonstration of the **AI Reasoning Logic** without local setup:
 
-### 👉 [[CLICK HERE TO LAUNCH IN GOOGLE AI STUDIO](https://aistudio.google.com/app/prompts/...](https://ai.studio/apps/drive/1Rtuph7gWxTNvfOSg0yFZzlDG3UN_7TQ4))
+### 👉 https://ai.studio/apps/drive/1Rtuph7gWxTNvfOSg0yFZzlDG3UN_7TQ4
 *(Replace this link with your PUBLIC Share Link from AI Studio)*
 
 1.  Open the link above.
