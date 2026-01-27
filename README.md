@@ -41,4 +41,4 @@ The core intelligence of ResQ-Eye uses this engineered System Instruction:
 - **Language:** TypeScript
 
 ---
-*Created by [Your Name] for the Gemini 3 Hackathon.*
+*Created by YASSINE BEHNANE for the Gemini 3 Hackathon.*
