@@ -1,44 +1,20 @@
-# 🛡️ ResQ-Eye: The Sentient First Responder
-### 🏆 Google DeepMind Gemini 3 Global Hackathon Entry
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
-> **"Reasoning saves lives."**
+# Run and deploy your AI Studio app
 
----
+This contains everything you need to run your app locally.
 
-## 🚨 Project Overview
-**ResQ-Eye** acts as a **Structural Engineer & Tactical Commander AI**. Unlike traditional drones that only "see," ResQ-Eye **reasons**. It analyzes video feeds from disaster zones (earthquakes, fires) to:
-1.  **Calculate Structural Physics:** Predict collapse risks using geometric analysis.
-2.  **Triangulate Survivors:** Fuse visual data to spot trapped victims.
-3.  **Plan Rescue Routes:** Suggest safest entry points for first responders.
+View your app in AI Studio: https://ai.studio/apps/drive/1Rtuph7gWxTNvfOSg0yFZzlDG3UN_7TQ4
 
-Built entirely using **Google AI Studio** to leverage the native reasoning capabilities of the Gemini 1.5/2.0 Pro & Flash models.
+## Run Locally
 
----
+**Prerequisites:**  Node.js
 
-## ⚡ How to Test (The Logic Core)
-This repository contains the exported application code. However, for the most direct demonstration of the **AI Reasoning Logic** without local setup:
 
-### 👉 https://ai.studio/apps/drive/1Rtuph7gWxTNvfOSg0yFZzlDG3UN_7TQ4
-*(Replace this link with your PUBLIC Share Link from AI Studio)*
-
-1.  Open the link above.
-2.  Add your API Key.
-3.  Upload any disaster footage.
-4.  Watch the **Strategic Dashboard** generation in real-time.
-
----
-
-## 🧠 The "Reasoning" Engine (System Prompt)
-The core intelligence of ResQ-Eye uses this engineered System Instruction:
-
-> *You are **ResQ-Eye**. Simulate a military-grade digital dashboard. Do not speak in paragraphs. Analyze the footage for Structural Integrity (Collapse Probability 0-100%), Bio-Signatures (Survivors), and Tactical Recommendations.*
-
----
-
-## 💻 Tech Stack
-- **AI Core:** Google Gemini 1.5 Pro / 2.0 Flash Experimental
-- **Framework:** React + Vite (Generated via Google AI Studio)
-- **Language:** TypeScript
-
----
-*Created by YASSINE BEHNANE for the Gemini 3 Hackathon.*
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`

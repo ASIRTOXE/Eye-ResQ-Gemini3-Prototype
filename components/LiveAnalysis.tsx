@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { AlertTriangle, Activity, Volume2, VolumeX, RefreshCw, SwitchCamera, PlayCircle } from 'lucide-react';
+import { AlertTriangle, Activity, Volume2, VolumeX, RefreshCw, SwitchCamera, PlayCircle, WifiOff } from 'lucide-react';
 import { analyzeLiveFrame } from '../services/geminiService';
 
 const LiveAnalysis: React.FC = () => {
@@ -7,9 +7,11 @@ const LiveAnalysis: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const demoCanvasRef = useRef<HTMLCanvasElement>(null);
   
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const isAnalyzingRef = useRef(false); // Ref to strictly prevent overlapping requests
+  // Refs for state accessed inside intervals (to solve closure staleness)
+  const isDemoModeRef = useRef(false);
+  const isAudioEnabledRef = useRef(true);
   
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<string>("INITIALIZING LINK...");
   const [isDanger, setIsDanger] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +25,15 @@ const LiveAnalysis: React.FC = () => {
   const analysisInterval = useRef<number | null>(null);
   const demoAnimationRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Sync state to refs
+  useEffect(() => {
+    isDemoModeRef.current = isDemoMode;
+  }, [isDemoMode]);
+
+  useEffect(() => {
+    isAudioEnabledRef.current = isAudioEnabled;
+  }, [isAudioEnabled]);
 
   useEffect(() => {
     startCamera();
@@ -43,16 +54,13 @@ const LiveAnalysis: React.FC = () => {
     stopCamera(); 
     stopDemoMode();
     setError(null);
-    setIsDemoMode(false);
+    setDemoModeState(false);
     
     const targetFacingMode = overrideFacingMode !== undefined ? overrideFacingMode : facingMode;
     
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        // Explicitly handle unsupported browsers by switching to demo mode
-        console.warn("Camera API not supported. Switching to Demo Mode.");
-        startDemoMode();
-        return;
+        throw new Error("Camera API is not supported in this browser.");
       }
 
       // Check for devices - purely informational
@@ -83,8 +91,7 @@ const LiveAnalysis: React.FC = () => {
             });
             if (targetFacingMode) setFacingMode(undefined); 
         } catch (secondErr: any) {
-             // Re-throw to be caught by the outer block which handles fallback to demo
-             throw secondErr;
+            throw secondErr;
         }
       }
 
@@ -100,32 +107,12 @@ const LiveAnalysis: React.FC = () => {
       startAnalysis();
 
     } catch (err: any) {
-      // Prioritize checking for missing camera/permissions BEFORE logging an error
-      const errMsg = (err.message || "").toLowerCase();
-      const errName = (err.name || "");
+      // Suppress "Error accessing camera" for "Requested device not found" and other common errors
+      // Instead of logging an error, we log a warning and fallback gracefully.
+      console.warn("Camera initialization failed, switching to Simulation Mode:", err.message || err);
       
-      // Auto-fallback to simulation if no camera found or denied
-      if (
-          errMsg.includes('no camera') || 
-          errMsg.includes('not found') || 
-          errName === 'NotFoundError' || 
-          errName === 'DevicesNotFoundError' ||
-          errName === 'NotAllowedError' || 
-          errName === 'PermissionDeniedError' ||
-          errMsg.includes('denied')
-      ) {
-         console.warn("Camera unavailable (" + errName + "). Defaulting to Simulation Mode.");
-         startDemoMode();
-         return;
-      }
-
-      // Only log as error if it's a genuine unexpected failure
-      console.error("Error accessing camera:", err);
-      
-      let msg = "Could not access webcam.";
-      msg = `Camera Error: ${err.message || "Unknown error"}`;
-      
-      setError(msg);
+      // Unconditional fallback to Demo Mode for any camera initialization error
+      startDemoMode();
     }
   };
 
@@ -152,10 +139,21 @@ const LiveAnalysis: React.FC = () => {
      }
   }
 
+  const setDemoModeState = (enabled: boolean) => {
+      setIsDemoMode(enabled);
+      isDemoModeRef.current = enabled;
+  }
+
+  const simulateSignalLoss = () => {
+    stopCamera();
+    stopDemoMode();
+    setError("CONNECTION TERMINATED // MANUAL OVERRIDE");
+  };
+
   const startDemoMode = () => {
     stopCamera();
     setError(null);
-    setIsDemoMode(true);
+    setDemoModeState(true);
     setCurrentStatus("SIMULATION ACTIVE // SCANNING SYNTHETIC FEED");
     
     // Start animation loop
@@ -219,35 +217,43 @@ const LiveAnalysis: React.FC = () => {
         demoAnimationRef.current = requestAnimationFrame(animate);
     };
     
-    // Initialize canvas size once mounted
+    // Initialize canvas size and start analysis after a short delay to allow React to render the canvas
     setTimeout(() => {
         if (demoCanvasRef.current) {
             demoCanvasRef.current.width = 640;
             demoCanvasRef.current.height = 360;
             animate();
             startAnalysis(); // Start analyzing the canvas
+        } else {
+            // Retry once if canvas not yet ready
+            setTimeout(() => {
+                if (demoCanvasRef.current) {
+                    demoCanvasRef.current.width = 640;
+                    demoCanvasRef.current.height = 360;
+                    animate();
+                    startAnalysis();
+                }
+            }, 200);
         }
     }, 100);
   };
 
   const startAnalysis = () => {
     if (analysisInterval.current) clearInterval(analysisInterval.current);
-    
-    // Reset analysis lock
-    isAnalyzingRef.current = false;
-    setIsAnalyzing(false);
 
-    // Increase interval to 6000ms (6 seconds) to prevent rate limiting (429)
-    // Free tier allows ~15 RPM, but bursts can trigger limits. 6s is conservative.
+    // INCREASED INTERVAL TO 6 SECONDS TO PREVENT 429 ERRORS
     analysisInterval.current = window.setInterval(async () => {
-      // Prevent overlapping requests
-      if (isAnalyzingRef.current) return;
-
       let base64Image = '';
       
-      if (demoCanvasRef.current) {
+      const inDemoMode = isDemoModeRef.current; // Use Ref for fresh value inside interval
+
+      if (inDemoMode) {
+          if (!demoCanvasRef.current) return;
           base64Image = demoCanvasRef.current.toDataURL('image/jpeg', 0.8);
-      } else if (videoRef.current && canvasRef.current && videoRef.current.readyState === 4) {
+      } else {
+          if (!videoRef.current || !canvasRef.current) return;
+          if (videoRef.current.readyState !== 4) return;
+          
           const context = canvasRef.current.getContext('2d');
           if (context) {
             canvasRef.current.width = videoRef.current.videoWidth;
@@ -259,7 +265,6 @@ const LiveAnalysis: React.FC = () => {
       
       if (!base64Image) return;
 
-      isAnalyzingRef.current = true;
       setIsAnalyzing(true);
         
       try {
@@ -269,26 +274,19 @@ const LiveAnalysis: React.FC = () => {
           console.error("Frame analysis failed", err);
       }
       
-      isAnalyzingRef.current = false;
       setIsAnalyzing(false);
     }, 6000); 
   };
 
   const handleAnalysisResult = (text: string) => {
-    // Handle Quota Error gracefully
-    if (text === "RATE_LIMIT") {
-        setCurrentStatus("SYSTEM COOLDOWN // RETRYING...");
-        setIsDanger(false); 
-        return;
-    }
-
     const cleanText = text.trim();
     setCurrentStatus(cleanText);
 
+    // If Rate Limit message, treat as Alert (Red)
     const isSafe = cleanText.toUpperCase().includes("SAFE");
     setIsDanger(!isSafe);
 
-    if (!isSafe && isAudioEnabled) {
+    if (!isSafe && isAudioEnabledRef.current) { // Use Ref for fresh value
       speakAlert(cleanText);
     }
   };
@@ -297,12 +295,21 @@ const LiveAnalysis: React.FC = () => {
     if (!window.speechSynthesis) return;
     if (window.speechSynthesis.speaking) return;
 
+    // Don't speak technical error messages like "Rate Limit" repeatedly
+    if (text.includes("RATE LIMIT") || text.includes("STANDBY")) return;
+
     const speechText = text.replace(/^ALERT:/i, "").trim();
     const utterance = new SpeechSynthesisUtterance(speechText);
     utterance.rate = 1.1;
     utterance.pitch = 1.0;
     window.speechSynthesis.speak(utterance);
   };
+
+  const handleAudioToggle = () => {
+      const newState = !isAudioEnabled;
+      setIsAudioEnabled(newState);
+      isAudioEnabledRef.current = newState;
+  }
 
   if (error) {
     return (
@@ -377,11 +384,19 @@ const LiveAnalysis: React.FC = () => {
                         </button>
                     )}
                     <button 
-                        onClick={() => setIsAudioEnabled(!isAudioEnabled)}
+                        onClick={handleAudioToggle}
                         className={`p-2.5 bg-black/60 border rounded-lg text-white backdrop-blur-sm transition-colors ${isAudioEnabled ? 'border-slate-700 hover:bg-slate-800' : 'border-red-500/50 bg-red-900/20 text-red-400'}`}
                         title={isAudioEnabled ? "Mute Alerts" : "Enable Audio"}
                     >
                         {isAudioEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                    </button>
+
+                    <button
+                        onClick={simulateSignalLoss}
+                        className="p-2.5 bg-black/60 border border-slate-700 hover:bg-red-900/30 hover:border-red-500 hover:text-red-500 rounded-lg text-white backdrop-blur-sm transition-colors"
+                        title="Simulate Signal Loss"
+                    >
+                        <WifiOff className="w-5 h-5" />
                     </button>
                 </div>
             </div>

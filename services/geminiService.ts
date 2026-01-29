@@ -99,21 +99,18 @@ export const analyzeLiveFrame = async (base64Image: string): Promise<string> => 
 
     return response.text || "SAFE";
   } catch (error: any) {
-    // Robustly check for Rate Limit / Quota Exceeded (429)
-    // The error object structure can vary (nested error object, status property, etc.)
+    // Enhanced Handle Quota Limit (429) gracefully
+    const errorMessage = (error.message || JSON.stringify(error)).toLowerCase();
     const isRateLimit = 
         error.status === 429 || 
-        error.response?.status === 429 ||
+        errorMessage.includes('429') || 
+        errorMessage.includes('quota') || 
+        errorMessage.includes('resource_exhausted') ||
         error.error?.code === 429 ||
-        error.error?.status === 'RESOURCE_EXHAUSTED' ||
-        error.message?.includes('429') || 
-        error.message?.includes('quota') ||
-        error.message?.includes('RESOURCE_EXHAUSTED') ||
-        JSON.stringify(error).includes('RESOURCE_EXHAUSTED'); // Fallback check
+        error.error?.status === 'RESOURCE_EXHAUSTED';
 
     if (isRateLimit) {
-        console.warn("Gemini Rate Limit Hit (429) - Skipping frame.");
-        return "RATE_LIMIT";
+        return "STATUS: RATE LIMIT EXCEEDED // STANDBY";
     }
 
     console.error("Live Analysis Error:", error);
